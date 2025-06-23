@@ -3,7 +3,7 @@ T = 105;
 num_RU = 3;
 UERU = 5; % UE under every RU
 total_UE = UERU * num_RU;
-num_RB = 30;
+num_RB = 20;
 user_RU = zeros(1, total_UE); % RU index for every user
 
 B = 200*1000;
