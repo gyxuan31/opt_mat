@@ -9,9 +9,10 @@ function total_rate = compute_total_rate(e, predicted_len, total_UE, num_RB, pre
         for n = 1:total_UE
             for k = 1:num_RB
                 signal = P * pre_distance(t, n, user_RU(n))^(-eta) * rayleigh_gain(n, k);
-                interference = 0;
+                interference = -E(t,n,k)*P*pre_distance(t,n,user_RU(others))^(-eta) * rayleigh_gain(n, k); % add everyone then substract myself
+                
                 for others = 1:total_UE
-                    interference = interference + E(t, others, k) * P * pre_distance(t, n, user_RU(others))^(-eta) * rayleigh_gain(n, k);
+                    interference = interference + E(t, others, k)*P*pre_distance(t,n,user_RU(others))^(-eta) * rayleigh_gain(n, k);
                 end
                 SINR = signal / (interference + sigmsqr);
                 data_rate(n) = data_rate(n) + B*E(t,n,k)*log(1+SINR);

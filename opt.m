@@ -120,7 +120,7 @@ for t = 1:100
     % OP
     pre_distance = distance(t:t+predicted_len-1, :, :);
 
-    fitnessFcn = @(e) -compute_total_rate(round(e), predicted_len, total_UE, num_RB, pre_distance, rayleigh_gain, P, sigmsqr, eta, B, T, user_RU, num_RU);
+    fitnessFcn = @(e) compute_total_rate(round(e), predicted_len, total_UE, num_RB, pre_distance, rayleigh_gain, P, sigmsqr, eta, B, T, user_RU, num_RU);
     options = optimoptions('ga', 'PopulationSize', 40, 'MaxGenerations', 50, 'Display', 'iter');
     [e_opt, fval] = ga(fitnessFcn, nvars, [], [], [], [], lb, ub, @constraints, options);
 
