@@ -1,4 +1,5 @@
 rng(1);
+clear all;
 
 T = load('parameter.mat').T;
 num_RU = load('parameter.mat').num_RU;
@@ -13,7 +14,6 @@ P = load('parameter.mat').P;
 sigmsqr = load('parameter.mat').sigmsqr;
 eta = double(load('parameter.mat').eta);
 predicted_len = load('parameter.mat').predicted_len;
-
 rayleigh_gain = load('parameter.mat').rayleigh_gain;
 
 user_RU_norm = zeros(1, total_UE); % RU index for every user
@@ -26,9 +26,11 @@ load_pred = load('parameter.mat');
 prediction = load_pred.prediction;
 prediction = reshape(prediction, T-num_ref, predicted_len, total_UE, num_RU);
 
+
+% ----- NORMAL - randomly generate e -----
 for t = 1:T
     for i = 1:total_UE
-        temp = zeros(1, num_RU);rand
+        temp = zeros(1, num_RU);
         for j = 1:num_RU
             temp(j) = distance(t,i,j);
         end
@@ -36,8 +38,6 @@ for t = 1:T
     end
 end
 
-
-% ----- NORMAL - randomly generate e -----
 rb_counts = randi([0, 5], 1, total_UE); % initial allocation
 e_norm = zeros(total_UE, num_RB);
 record_norm = [];
@@ -48,6 +48,7 @@ for i = 1:total_UE
         e_norm(i, selected_rbs) = 1;
     end
 end
+
 
 for t = num_ref+1:T
     data_rate_norm = zeros(1, total_UE);
@@ -73,7 +74,7 @@ for t = num_ref+1:T
 end
 
 %  ----- OP -----
-nvars = double(predicted_len * total_UE * num_RB)
+nvars = double(predicted_len * total_UE * num_RB);
 
 lb = zeros(1, nvars);
 ub = ones(1, nvars);
@@ -83,6 +84,7 @@ record_op = [];
 for t = 1:T-num_ref
     disp(t);
     data_rate_op = zeros(1, total_UE);
+
     % OP
     pre_distance = reshape(prediction(t,:,:,:), predicted_len, total_UE, num_RU);
     for i = 1:predicted_len
@@ -94,24 +96,28 @@ for t = 1:T-num_ref
             [~, user_RU_op(u)] = min(temp);
         end
     end
-    % user_RU_norm;
-    % user_RU_op;
 
-    popSize = 20;
+    RU_UE = cell(1, num_RU); % save the index of UE under every RU
+    for r = 1:num_RU
+        idx = find(user_RU_op == r);
+        RU_UE{r} = idx; % UE index of every RU
+    end
 
-    % initPop = rand(popSize, nvars);
-    % initPop(1, :) = reshape(e_norm, 1, []);
+    popSize = 50;
+    initPop = zeros(popSize, nvars);
+    initPop(popSize/2+1:end, :) = 1;
 
-    objfun = @(e) compute_total_rate(e, predicted_len, total_UE, num_RB, pre_distance, rayleigh_gain, P, sigmsqr, eta, B, T, user_RU_op, num_RU);
-    confun = @(e) constraint(e, predicted_len, total_UE, num_RB, gamma, num_setreq, rb_counts);
-    options = optimoptions('ga', 'PopulationSize', popSize, 'MaxGenerations', 50, 'Display', 'iter');
+    objfun = @(e) compute_total_rate(round(e), predicted_len, total_UE, num_RB, pre_distance, rayleigh_gain, P, sigmsqr, eta, B, user_RU_op);
+    confun = @(e) constraint(e, predicted_len, total_UE, num_RB, gamma, num_setreq, rb_counts, num_RU, RU_UE);
+    options = optimoptions('ga', 'PopulationSize', popSize, 'MaxGenerations', 50, 'Display', 'iter',  'ConstraintTolerance', 1e-6,...
+        'InitialPopulationMatrix', initPop);
     [e_opt, fval] = ga(objfun, nvars, [], [], [], [], lb, ub, confun, options);
 
     % fmin = @(e) compute_total_rate(e, predicted_len, total_UE, num_RB, pre_distance, rayleigh_gain, P, sigmsqr, eta, B, T, user_RU, num_RU);
     % options = optimoptions('fmincon', 'MaxIterations', 100, 'Display', 'iter-detailed', ...
     %     'MaxFunctionEvaluations', 1e5,'Algorithm','interior-point'); % , 'SpecifyObjectiveGradient',true
     % [e_opt, fval] = fmincon(fmin, repmat(e_norm, predicted_len, 1, 1), [], [], [], [], lb, ub, @constraints, options); % repmat(e_norm, predicted_len, 1, 1)
-    e_opt
+    e_opt;
     for i = 1: nvars
         if e_opt(i) >= 0.5
             e_opt(i) = 1;
@@ -146,18 +152,22 @@ for t = 1:T-num_ref
     fprintf('Normal data rate: %.2f\n', record_norm(t));
     fprintf('Optmed data rate: %.2f\n', record_op(t));
     
-    % subplot(1,2,1);
-    % imagesc(squeeze(e_norm));
-    % xlabel('RB Index');
-    % ylabel('User Index');
-    % title('Optimized RB Allocation (1 = Allocated)');
-    % 
-    % subplot(1,2,2);
-    % imagesc(squeeze(e_opt(t, :, :)));
-    % xlabel('RB Index');
-    % ylabel('User Index');
-    % title('Optimized RB Allocation (1 = Allocated)');
-    % colorbar;
+    subplot(1,2,1);
+    imagesc(squeeze(e_norm));
+    xlabel('RB Index');
+    ylabel('User Index');
+    title('normal RB Allocation');
+
+    subplot(1,2,2);
+    hold on;
+    imagesc(squeeze(e_opt(t, :, :)));
+    xlabel('RB Index');
+    ylabel('User Index');
+    title('Optimized RB Allocation');
+    xline(0.5 : 1 : num_RB + 0.5, 'k-');
+    yline(0.5 : 1 : total_UE + 0.5, 'k-');
+    colorbar;
+    hold off;
 
 end
 
@@ -166,8 +176,8 @@ fprintf('Optmed data rate: %.2f\n', record_op);
 
 figure('Color','w')
 hold on;
-t_len = length(record_norm);
-plot(1:t_len, record_norm, 'LineWidth', 2, 'Color', 'k');
+t_len = length(record_op);
+plot(1:t_len, record_norm(1:t_len), 'LineWidth', 2, 'Color', 'k');
 plot(1:t_len, record_op, 'LineWidth', 2, 'Color', '#8fbc8f');
 
 xlabel('Time Step');
@@ -176,7 +186,5 @@ title('Geometric Data Rate');
 legend('Normal Allocation', 'Optimized Allocation','Location','southeast');
 
 grid on;
-ylim([200, max(record_op)*1.05]);
-
-
-
+box on;
+% ylim([200, max(record_op)*1.05]);

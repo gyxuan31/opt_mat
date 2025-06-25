@@ -91,5 +91,5 @@ xlabel('Time Step');
 ylabel('Total Data Rate (bps)');
 title('Total Data Rate over Time (Normal Allocation)');
 grid on;
-ylim([0, max(record_norm)*1.05]);  % 纵轴从0到最大值稍微放大一点
+ylim([0, max(record_norm)*1.05]);
 

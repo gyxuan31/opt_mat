@@ -162,18 +162,18 @@ for t = 1:100
     fprintf('Normal data rate: %.2f\n', record_norm(t));
     fprintf('Optmed data rate: %.2f\n', record_op(t));
     
-    % subplot(1,2,1);
-    % imagesc(squeeze(e_norm));
-    % xlabel('RB Index');
-    % ylabel('User Index');
-    % title('Optimized RB Allocation (1 = Allocated)');
-    % 
-    % subplot(1,2,2);
-    % imagesc(squeeze(e_opt(t, :, :)));
-    % xlabel('RB Index');
-    % ylabel('User Index');
-    % title('Optimized RB Allocation (1 = Allocated)');
-    % colorbar;
+    subplot(1,2,1);
+    imagesc(squeeze(e_norm));
+    xlabel('RB Index');
+    ylabel('User Index');
+    title('Optimized RB Allocation (1 = Allocated)');
+
+    subplot(1,2,2);
+    imagesc(squeeze(e_opt(t, :, :)));
+    xlabel('RB Index');
+    ylabel('User Index');
+    title('Optimized RB Allocation (1 = Allocated)');
+    colorbar;
 
 
 end
