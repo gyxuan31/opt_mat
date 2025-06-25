@@ -25,8 +25,7 @@ load_pred = load('parameter.mat');
 prediction = load_pred.prediction;
 prediction = reshape(prediction, T-num_ref, predicted_len, total_UE, num_RU);
 
-
-% ----- RANDOM - randomly generate e -----
+% calculate every UE connect which RU
 for t = 1:T
     for i = 1:total_UE
         temp = zeros(1, num_RU);
@@ -37,9 +36,14 @@ for t = 1:T
     end
 end
 
+% init
 rb_counts = randi([0, num_RB/num_RU], 1, total_UE); % initial allocation
 e_random = zeros(total_UE, num_RB);
+e_static = zeros(total_UE, num_RB);
 record_random = [];
+record_static = [];
+
+% RANDOM - randomly generate e - fix allocation
 for i = 1:total_UE
     count = rb_counts(i);
     if count > 0
@@ -48,8 +52,15 @@ for i = 1:total_UE
     end
 end
 
-
+% ----- NORMAL BASELINE -----
 for t = num_ref+1:T
+    RU_UE_norm = cell(1, num_RU); % save the index of UE under every RU
+    for r = 1:num_RU
+        idx = find(user_RU_norm == r);
+        RU_UE_norm{r} = idx; % UE index of every RU
+    end
+
+    % ----- RANDOM -----
     data_rate_random = zeros(1, total_UE);
     for n = 1:total_UE
         for k = 1:num_RB
@@ -70,10 +81,56 @@ for t = num_ref+1:T
         end
     end
     record_random = [record_random, sum(log(1+data_rate_random))];
+
+    % ----- STATIC -----
+    for r = 1:num_RU
+        ue_list = RU_UE_norm{r};
+        num_ue = numel(ue_list);
+
+        if num_ue > 0
+            RB_per_UE = floor(num_RB / num_ue); % num of RB allocated to every UE
+            remaining_RB = num_RB - RB_per_UE * num_ue;
+
+            RB_pool = randperm(num_RB);
+    
+            for i = 1:num_ue
+                u = ue_list(i);
+                start_idx = (i - 1) * RB_per_UE + 1;
+                end_idx = i * RB_per_UE;
+  
+                e_static(u, RB_pool(start_idx:end_idx)) = 1;
+            end
+
+            for j = 1:remaining_RB % remaining RB randomly allocate
+                u = ue_list(j);
+                e_static(u, RB_pool(RB_per_UE * num_ue + j)) = 1;
+            end
+        end
+    end
+
+    data_rate_static = zeros(1, total_UE);
+    for n = 1:total_UE % calculate data rate
+        for k = 1:num_RB
+            if e_static(n, k) == 1
+                signal = P * distance(t, n, user_RU_norm(n))^(-eta) * rayleigh_gain(n, k);
+                interference = 0;
+    
+                for others = 1:total_UE
+                    for i = 1:num_RU
+                        if others ~= n && e_static(others, k) == 1 && user_RU_norm(others) ~= user_RU_norm(n)
+                            interference = interference + ...
+                                P * distance(t, n, user_RU_norm(i))^(-eta) * rayleigh_gain(n, k);
+                        end
+                    end
+                end
+    
+                SINR = signal / (interference + sigmsqr);
+                data_rate_static(n) = data_rate_static(n) + B * log(1 + SINR);
+            end
+        end
+    end
+    record_static = [record_static, sum(log(1 + data_rate_static))];
 end
-
-% ----- STATIC -----
-
 
 %  ----- OP -----
 nvars = double(predicted_len * total_UE * num_RB);
@@ -120,13 +177,13 @@ for t = 1:T-num_ref
     %     'MaxFunctionEvaluations', 1e5,'Algorithm','interior-point'); % , 'SpecifyObjectiveGradient',true
     % [e_opt, fval] = fmincon(fmin, repmat(e_norm, predicted_len, 1, 1), [], [], [], [], lb, ub, @constraints, options); % repmat(e_norm, predicted_len, 1, 1)
     e_opt;
-    % for i = 1: nvars
-    %     if e_opt(i) >= 0.5
-    %         e_opt(i) = 1;
-    %     else
-    %         e_opt(i) = 0;
-    %     end
-    % end
+    for i = 1: nvars
+        if e_opt(i) >= 0.5
+            e_opt(i) = 1;
+        else
+            e_opt(i) = 0;
+        end
+    end
     e_opt = reshape(e_opt, predicted_len, total_UE, num_RB);
     
     % check RB cannot allocated to 2 UEs under one RU
@@ -139,7 +196,7 @@ for t = 1:T-num_ref
     for i = 1:num_RU % set the repeat UE = 0
         for k = 1:num_RB
             ue_list = RU_UE_norm{i}; % UE under RU(i)
-            allocated_UE = ue_list(e_opt(t, ue_list, k) > 0);
+            allocated_UE = ue_list(e_opt(1, ue_list, k) > 0);
     
             if numel(allocated_UE) > 1
                 dist_list = zeros(1, numel(allocated_UE));
