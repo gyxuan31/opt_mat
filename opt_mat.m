@@ -55,7 +55,7 @@ for i = 1:total_UE
     end
 end
 
-% ----- NORMAL BASELINE -----
+% ---------- NORMAL BASELINE ----------
 for t = num_ref+1:T
     RU_UE_norm = cell(1, num_RU); % save the index of UE under every RU
     for r = 1:num_RU
@@ -95,12 +95,12 @@ for t = num_ref+1:T
             remaining_RB = num_RB - RB_per_UE * num_ue;
 
             RB_pool = randperm(num_RB);
-    
+
             for i = 1:num_ue
                 u = ue_list(i);
                 start_idx = (i - 1) * RB_per_UE + 1;
                 end_idx = i * RB_per_UE;
-  
+
                 e_avg(u, RB_pool(start_idx:end_idx)) = 1;
             end
 
@@ -118,7 +118,7 @@ for t = num_ref+1:T
             if e_avg(n, k) == 1
                 signal = P * distance(t, n, user_RU_norm(n))^(-eta) * rayleigh_gain(n, k);
                 interference = 0;
-    
+
                 for others = 1:total_UE
                     for i = 1:num_RU
                         if others ~= n && e_avg(others, k) == 1 && user_RU_norm(others) ~= user_RU_norm(n)
@@ -127,7 +127,7 @@ for t = num_ref+1:T
                         end
                     end
                 end
-    
+
                 SINR = signal / (interference + sigmsqr);
                 data_rate_static(n) = data_rate_static(n) + B * log(1 + SINR);
             end
@@ -136,7 +136,7 @@ for t = num_ref+1:T
     rec_dr_avg = [rec_dr_avg, sum(log(1 + data_rate_static))];
 end
 
-%  ----- OP -----
+%  ---------- OP ----------
 nvars = double(predicted_len * total_UE * num_RB);
 
 lb = zeros(1, nvars);
@@ -273,10 +273,10 @@ end
 fprintf('Normal data rate: %.2f\n', rec_dr_random);
 fprintf('Optmed data rate: %.2f\n', rec_dr_op);
 
-% PLOT - data rate geometric mean value
+% PLOT 1 - data rate geometric mean value
 figure('Color','w')
 hold on;
-t_len = 60;%length(record_op);
+t_len = length(rec_dr_op);
 plot(1:t_len, rec_dr_random(1:t_len), 'LineWidth', 2, 'Color', '#3480b8');
 plot(1:t_len, rec_dr_avg(1:t_len), 'LineWidth', 2, 'Color', '#8fbc8f')
 plot(1:t_len, rec_dr_op(1:t_len), 'LineWidth', 2, 'Color', '#c82423');
@@ -287,6 +287,43 @@ legend('Static Allocation', 'Average Allocation', 'MPC-based Allocation', 'Locat
 
 grid on;
 box on;
+hold off;
 % ylim([200, max(record_op)*1.05]);
 
-% PLOT - data rate geometric mean value
+% PLOT 2 - resource utility
+util_op = zeros(1, T);
+util_random = zeros(1, T);
+util_avg = zeros(1, T);
+for t = 1:T
+    % RANDOM
+    util_random_list = any(e_random, 1); % (total_UE, num_RB)
+    util_random(t) = sum(util_random_list) / num_RB;
+    % AVG
+    e_avag = squeeze(rec_e_avg(t,:,:));
+    util_avg_list = any(e_avag, 1);
+    util_avg(t) = sum(util_avg_list) / num_RB;
+    % OP
+    e_op = squeeze(rec_e_op(t,:,:)); % (T, total_UE, num_RB);
+    util_op_list = any(e_op, 1);
+    util_op(t) = sum(util_op_list) / num_RB;
+end
+figure('Color','w')
+hold on;
+t_len = length(util_op);
+plot(1:t_len, util_random(1:t_len), 'LineWidth', 2, 'Color', '#3480b8');
+plot(1:t_len, util_avg(1:t_len), 'LineWidth', 2, 'Color', '#8fbc8f')
+plot(1:t_len, util_op(1:t_len), 'LineWidth', 2, 'Color', '#c82423');
+
+xlabel('Time Step');
+ylabel('RB Utility (%)');
+legend('Static Allocation', 'Average Allocation', 'MPC-based Allocation', 'Location','southeast');
+
+grid on;
+box on;
+hold off;
+
+% PLOT 3 - data rate of every RU
+
+        
+
+% PLOT 4 - UE number increase
