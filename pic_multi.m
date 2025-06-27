@@ -21,7 +21,10 @@ multi_prediction = load('multi_UE.mat').multi_prediction;
 
 multi_rec_dr_random = [];
 multi_rec_dr_avg = [];
-multi_rec_dr_op = [];
+multi_rec_dr_op = []; 
+multi_rec_e_random = zeros(length(multi_num_UE), multi_num_UE(end)*num_RB, num_RB);
+multi_rec_e_op = zeros(length(multi_num_UE), multi_num_UE(end)*num_RB, num_RB);
+multi_rec_e_avg = zeros(length(multi_num_UE), multi_num_UE(end)*num_RB, num_RB);
 
 for a = 1:length(multi_num_UE)
     UERU = multi_num_UE(a);
@@ -70,6 +73,30 @@ for a = 1:length(multi_num_UE)
         end
     
         % ----- RANDOM -----
+        % check RB cannot allocated to 2 UEs under one RU
+        for i = 1:num_RU % set the repeat UE = 0
+            for k = 1:num_RB
+                ue_list = RU_UE_norm{i}; % UE under RU(i)
+                allocated_UE_random = ue_list(e_random(ue_list, k) > 0);
+                if numel(allocated_UE_random) > 1
+                    dist_list = zeros(1, numel(allocated_UE_random));
+                    for idx = 1:numel(allocated_UE_random)
+                        u = allocated_UE_random(idx);
+                        dist_list(idx) = distance(t, u, i);
+                    end
+                    [~, min_idx] = min(dist_list);
+                    keep_ue = allocated_UE_random(min_idx); % keep the shortest UE
+                    for idx = 1:numel(allocated_UE_random) % set others = 0
+                        u = allocated_UE_random(idx);
+                        if u ~= keep_ue
+                            e_random(u, k) = 0;
+                        else
+                            e_random(u, k) = 1;
+                        end
+                    end
+                end
+            end
+        end
         data_rate_random = zeros(1, total_UE);
         for n = 1:total_UE
             for k = 1:num_RB
@@ -144,14 +171,14 @@ for a = 1:length(multi_num_UE)
     
     %  ---------- OP ----------
     nvars = double(predicted_len * total_UE * num_RB);
-    
+
     lb = zeros(1, nvars);
     ub = ones(1, nvars);
-    
+
     for t = 1
         disp(a);
         data_rate_op = zeros(1, total_UE);
-    
+
         % OP
         pre_distance = reshape(prediction(t,:,1:total_UE,:), predicted_len, total_UE, num_RU);
         for i = 1:predicted_len
@@ -163,23 +190,23 @@ for a = 1:length(multi_num_UE)
                 [~, user_RU_op(u)] = min(temp);
             end
         end
-    
+
         RU_UE_op = cell(1, num_RU); % save the index of UE under every RU
         for r = 1:num_RU
             idx = find(user_RU_op == r);
             RU_UE_op{r} = idx; % UE index of every RU
         end
-    
+
         popSize = 80;
         initPop = zeros(popSize, nvars);
         initPop(popSize/2+1:end, :) = 1;
-    
+
         objfun = @(e) compute_total_rate(round(e), predicted_len, total_UE, num_RB, pre_distance, rayleigh_gain, P, sigmsqr, eta, B, user_RU_op);
         confun = @(e) constraint(e, predicted_len, total_UE, num_RB, gamma, num_setreq, rb_counts, num_RU, RU_UE_op);
         options = optimoptions('ga', 'PopulationSize', popSize, 'MaxGenerations', 50, 'Display', 'iter',  'ConstraintTolerance', 1e-6,...
             'InitialPopulationMatrix', initPop);
         [e_opt, fval] = ga(objfun, nvars, [], [], [], [], lb, ub, confun, options);
-    
+
         % fmin = @(e) compute_total_rate(e, predicted_len, total_UE, num_RB, pre_distance, rayleigh_gain, P, sigmsqr, eta, B, T, user_RU, num_RU);
         % options = optimoptions('fmincon', 'MaxIterations', 100, 'Display', 'iter-detailed', ...
         %     'MaxFunctionEvaluations', 1e5,'Algorithm','interior-point'); % , 'SpecifyObjectiveGradient',true
@@ -193,13 +220,13 @@ for a = 1:length(multi_num_UE)
             end
         end
         e_opt = reshape(e_opt, predicted_len, total_UE, num_RB);  % shape(predicted_len, total_UE, num_RB)
-    
+
         % check RB cannot allocated to 2 UEs under one RU
         for i = 1:num_RU % set the repeat UE = 0
             for k = 1:num_RB
                 ue_list = RU_UE_norm{i}; % UE under RU(i)
                 allocated_UE = ue_list(e_opt(1, ue_list, k) > 0);
-    
+
                 if numel(allocated_UE) > 1
                     dist_list = zeros(1, numel(allocated_UE));
                     for idx = 1:numel(allocated_UE)
@@ -219,7 +246,7 @@ for a = 1:length(multi_num_UE)
                 end
             end
         end
-    
+
         % calculate the real data rate
         for n = 1:total_UE
             for k = 1:num_RB
@@ -241,24 +268,24 @@ for a = 1:length(multi_num_UE)
         end
         rec_dr_op = [rec_dr_op, sum(log(1+data_rate_op))];
         rec_e_op(t,:,:) = e_opt(1,:,:);
-    
-    
+
+
         fprintf('Normal data rate: %.2f\n', rec_dr_random(t));
         fprintf('Normal data rate: %.2f\n', rec_dr_avg(t));
         fprintf('Optmed data rate: %.2f\n', rec_dr_op(t));
-    
+
         subplot(1,2,1);
         hold on;
         imagesc(squeeze(e_random));
         xlabel('RB Index');
         ylabel('User Index');
-        title('normal RB Allocation');
+        title('Random RB Allocation');
         xlim([0.5, double(num_RB)+0.5]); 
         ylim([0.5, double(total_UE)+0.5]); 
         xline(0.5 : 1 : double(num_RB), 'Color', [0.5 0.5 0.5]);
         yline(0.5 : 1 : double(total_UE), 'Color', [0.5 0.5 0.5]);
         hold off;
-    
+
         subplot(1,2,2);
         hold on;
         imagesc(squeeze(e_opt(1, :, :)));
@@ -271,27 +298,15 @@ for a = 1:length(multi_num_UE)
         yline(0.5 : 1 : double(total_UE), 'Color', [0.5 0.5 0.5]);
         colorbar;
         hold off;
-    
+
     end
     multi_rec_dr_random = [multi_rec_dr_random, rec_dr_random];
     multi_rec_dr_avg = [multi_rec_dr_avg, rec_dr_avg];
-    multi_rec_dr_op = [multi_rec_dr_random, rec_dr_op];
+    multi_rec_dr_op = [multi_rec_dr_op, rec_dr_op];
+    multi_rec_e_op(a, 1:total_UE, :) = rec_e_op(t,:,:);
+    multi_rec_e_avg(a, 1:total_UE, :) = rec_e_avg(t,:,:);
+    multi_rec_e_random(a, 1:total_UE, :) = e_random(:,:);
 end
 fprintf('Normal data rate: %.2f\n', multi_rec_dr_op);
 fprintf('Optmed data rate: %.2f\n', multi_rec_dr_random);
 
-% PLOT 4 - UE number increase
-figure('Color','w')
-hold on;
-t_len = length(multi_rec_dr_op);
-plot(1:t_len, multi_rec_dr_random(1:t_len), 'LineWidth', 2, 'Color', '#3480b8');
-plot(1:t_len, multi_rec_dr_avg(1:t_len), 'LineWidth', 2, 'Color', '#8fbc8f')
-plot(1:t_len, multi_rec_dr_op(1:t_len), 'LineWidth', 2, 'Color', '#c82423');
-
-xlabel('UE number');
-ylabel('Geometric Mean of Data Rate');
-legend('Static Allocation', 'Average Allocation', 'MPC-based Allocation', 'Location','southeast');
-
-grid on;
-box on;
-hold off;

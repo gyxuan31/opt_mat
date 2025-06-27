@@ -58,7 +58,7 @@ for t = 1:T-num_ref
     % AVG
     e_avag = squeeze(rec_e_avg(t,:,:))
     util_avg_list = any(e_avag, 1);
-    util_avg(t) = sum(util_avg_list) / double(num_RB)
+    util_avg(t) = sum(util_avg_list) / double(num_RB);
     % OP
     e_op = squeeze(rec_e_op(t,:,:)); % (T, total_UE, num_RB);
     util_op_list = any(e_op, 1);
@@ -67,9 +67,9 @@ end
 figure('Color','w')
 hold on;
 t_len = length(util_op);
-plot(1:t_len, util_random(1:t_len), 'LineWidth', 2, 'Color', '#3480b8');
-plot(1:t_len, util_avg(1:t_len), 'LineWidth', 2, 'Color', '#8fbc8f')
-plot(1:t_len, util_op(1:t_len), 'LineWidth', 2, 'Color', '#c82423');
+plot(1:t_len, util_random(1:t_len), 'LineWidth', 1.5, 'Color', '#3480b8');
+plot(1:t_len, util_avg(1:t_len), 'LineWidth', 1.5, 'Color', '#8fbc8f')
+plot(1:t_len, util_op(1:t_len), 'LineWidth', 1.5, 'Color', '#c82423');
 xlim([1,100]); 
 ylim([0,1]);
 xlabel('Time Step');
@@ -140,4 +140,26 @@ for a = 1:num_RU
 
 end
 legend('Static Allocation', 'Average Allocation', 'MPC-based Allocation', 'Location','northeast');
+hold off;
+
+
+% PLOT 4 - UE number increase
+multi_rec_dr_random = load('multi_output.mat').multi_rec_dr_random;
+multi_rec_dr_avg = load('multi_output.mat').multi_rec_dr_avg;
+multi_rec_dr_op = load('multi_output.mat').multi_rec_dr_op;
+multi_num_UE = load('multi_UE.mat').multi_num_UE;
+
+figure('Color','w')
+hold on;
+t_len = length(multi_rec_dr_op) - 1;
+plot(1:t_len, multi_rec_dr_random(1:t_len), 'LineWidth', 1.5, 'Color', '#3480b8');
+plot(1:t_len, multi_rec_dr_avg(1:t_len), 'LineWidth', 1.5, 'Color', '#8fbc8f')
+plot(1:t_len, multi_rec_dr_op(1:t_len), 'LineWidth', 1.5, 'Color', '#c82423');
+
+xlabel('UE number');
+ylabel('Geometric Mean of Data Rate');
+legend('Static Allocation', 'Average Allocation', 'MPC-based Allocation', 'Location','southeast');
+
+grid on;
+box on;
 hold off;
