@@ -5,7 +5,7 @@ num_RU = load('multi_UE.mat').num_RU;
 % UERU = load('multi_UE.mat').UERU; % UE under every RU
 % total_UE = load('multi_UE.mat').total_UE;
 multi_num_UE = load('multi_UE.mat').multi_num_UE;
-num_RB = load('multi_UE.mat').num_RB;
+num_RB = double(load('multi_UE.mat').num_RB);
 num_ref = load('multi_UE.mat').num_ref;
 gamma = load('multi_UE.mat').gamma;
 num_setreq = load('multi_UE.mat').num_setreq;
@@ -16,9 +16,6 @@ eta = double(load('multi_UE.mat').eta);
 predicted_len = load('multi_UE.mat').predicted_len;
 rayleigh_gain = load('multi_UE.mat').rayleigh_gain;
 
-user_RU_norm = zeros(1, total_UE); % RU index for every user
-user_RU_op = zeros(1, total_UE);
-
 multi_distance = load('multi_UE.mat').multi_distance_true;
 multi_prediction = load('multi_UE.mat').multi_prediction;
 
@@ -26,15 +23,20 @@ multi_rec_dr_random = [];
 multi_rec_dr_avg = [];
 multi_rec_dr_op = [];
 
-for a = 1:len(multi_num_UE)
+for a = 1:length(multi_num_UE)
     UERU = multi_num_UE(a);
     total_UE = UERU * num_RU;
+
+    user_RU_norm = zeros(1, total_UE); % RU index for every user
+    user_RU_op = zeros(1, total_UE);
+    distance = squeeze(multi_distance(a,:,:,:));
+    prediction = squeeze(multi_prediction(a,:,:,:,:));
     % calculate every UE connect which RU
     for t = num_ref+1
         for i = 1:total_UE
             temp = zeros(1, num_RU);
             for j = 1:num_RU
-                temp(j) = multi_distance(t,i,j);
+                temp(j) = distance(t,i,j);
             end
             [~, user_RU_norm(i)] = min(temp);
         end
@@ -72,13 +74,13 @@ for a = 1:len(multi_num_UE)
         for n = 1:total_UE
             for k = 1:num_RB
                 if e_random(n, k) == 1
-                    signal = P * multi_distance(t, n, user_RU_norm(n)).^(-eta) * rayleigh_gain(n, k);
+                    signal = P * distance(t, n, user_RU_norm(n)).^(-eta) * rayleigh_gain(n, k);
                     interference = 0;
                     for others = 1:total_UE
                         for i = 1:num_RU
                             if others ~= n && e_random(others, k) == 1 && user_RU_norm(others) ~= user_RU_norm(n)
                                 interference = interference + ...
-                                    P * multi_distance(t, n, user_RU_norm(i))^(-eta) * rayleigh_gain(n, k);
+                                    P * distance(t, n, user_RU_norm(i))^(-eta) * rayleigh_gain(n, k);
                             end
                         end
                     end
@@ -98,13 +100,13 @@ for a = 1:len(multi_num_UE)
                 RB_per_UE = floor(num_RB / num_ue); % num of RB allocated to every UE
                 remaining_RB = num_RB - RB_per_UE * num_ue;
     
-                RB_pool = randperm(num_RB);
-        
+                RB_pool = randperm(num_RB); % random order
+    
                 for i = 1:num_ue
                     u = ue_list(i);
                     start_idx = (i - 1) * RB_per_UE + 1;
                     end_idx = i * RB_per_UE;
-      
+    
                     e_avg(u, RB_pool(start_idx:end_idx)) = 1;
                 end
     
@@ -120,14 +122,14 @@ for a = 1:len(multi_num_UE)
         for n = 1:total_UE % calculate data rate
             for k = 1:num_RB
                 if e_avg(n, k) == 1
-                    signal = P * multi_distance(t, n, user_RU_norm(n))^(-eta) * rayleigh_gain(n, k);
+                    signal = P * distance(t, n, user_RU_norm(n))^(-eta) * rayleigh_gain(n, k);
                     interference = 0;
         
                     for others = 1:total_UE
                         for i = 1:num_RU
                             if others ~= n && e_avg(others, k) == 1 && user_RU_norm(others) ~= user_RU_norm(n)
                                 interference = interference + ...
-                                    P * multi_distance(t, n, user_RU_norm(i))^(-eta) * rayleigh_gain(n, k);
+                                    P * distance(t, n, user_RU_norm(i))^(-eta) * rayleigh_gain(n, k);
                             end
                         end
                     end
@@ -146,14 +148,12 @@ for a = 1:len(multi_num_UE)
     lb = zeros(1, nvars);
     ub = ones(1, nvars);
     
-    
-    
     for t = 1
-        disp(t);
+        disp(a);
         data_rate_op = zeros(1, total_UE);
     
         % OP
-        pre_distance = reshape(prediction(t,:,:,:), predicted_len, total_UE, num_RU);
+        pre_distance = reshape(prediction(t,:,1:total_UE,:), predicted_len, total_UE, num_RU);
         for i = 1:predicted_len
             for u = 1:total_UE
                 temp = zeros(1, num_RU);
@@ -204,7 +204,7 @@ for a = 1:len(multi_num_UE)
                     dist_list = zeros(1, numel(allocated_UE));
                     for idx = 1:numel(allocated_UE)
                         u = allocated_UE(idx);
-                        dist_list(idx) = multi_distance(t, u, i);
+                        dist_list(idx) = distance(t, u, i);
                     end
                     [~, min_idx] = min(dist_list);
                     keep_ue = allocated_UE(min_idx); % keep the shortest UE
@@ -224,13 +224,13 @@ for a = 1:len(multi_num_UE)
         for n = 1:total_UE
             for k = 1:num_RB
                 if e_opt(1, n, k) >= 0.5
-                    signal = P * multi_distance(t, n, user_RU_norm(n))^(-eta) * rayleigh_gain(n, k);
+                    signal = P * distance(t, n, user_RU_norm(n))^(-eta) * rayleigh_gain(n, k);
                     interference = 0;
                     for others = 1:total_UE
                         for i = 1:num_RU
                             if others ~= n && e_opt(1, others, k) >= 0.5 && user_RU_norm(others) ~= user_RU_norm(n)
                                 interference = interference + ...
-                                    P * multi_distance(t, n, user_RU_norm(i))^(-eta) * rayleigh_gain(n, k);
+                                    P * distance(t, n, user_RU_norm(i))^(-eta) * rayleigh_gain(n, k);
                             end
                         end
                     end
@@ -240,7 +240,7 @@ for a = 1:len(multi_num_UE)
             end
         end
         rec_dr_op = [rec_dr_op, sum(log(1+data_rate_op))];
-        rec_e_op(t,:,:) = e_opt(1,:,:)
+        rec_e_op(t,:,:) = e_opt(1,:,:);
     
     
         fprintf('Normal data rate: %.2f\n', rec_dr_random(t));
