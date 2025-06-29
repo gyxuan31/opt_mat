@@ -56,7 +56,7 @@ for t = 1:T-num_ref
     temp = sum(util_random_list);
     util_random(t) = temp / double(num_RB);
     % AVG
-    e_avag = squeeze(rec_e_avg(t,:,:))
+    e_avag = squeeze(rec_e_avg(t,:,:));
     util_avg_list = any(e_avag, 1);
     util_avg(t) = sum(util_avg_list) / double(num_RB);
     % OP
@@ -144,10 +144,14 @@ hold off;
 
 
 % PLOT 4 - UE number increase
+multi_num_UE = load('multi_UE.mat').multi_num_UE;
+
 multi_rec_dr_random = load('multi_output.mat').multi_rec_dr_random;
 multi_rec_dr_avg = load('multi_output.mat').multi_rec_dr_avg;
 multi_rec_dr_op = load('multi_output.mat').multi_rec_dr_op;
-multi_num_UE = load('multi_UE.mat').multi_num_UE;
+multi_rec_e_random = load('multi_output.mat').multi_rec_e_random;
+multi_rec_e_avg = load('multi_output.mat').multi_rec_e_avg
+multi_rec_e_op = load('multi_output.mat').multi_rec_e_op;
 
 figure('Color','w')
 hold on;

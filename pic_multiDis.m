@@ -1,35 +1,32 @@
 rng(1);
 
-T = load('multi_UE.mat').T;
-num_RU = load('multi_UE.mat').num_RU;
-% UERU = load('multi_UE.mat').UERU; % UE under every RU
-% total_UE = load('multi_UE.mat').total_UE;
-multi_num_UE = load('multi_UE.mat').multi_num_UE;
-num_RB = double(load('multi_UE.mat').num_RB);
-num_ref = load('multi_UE.mat').num_ref;
-gamma = load('multi_UE.mat').gamma;
-num_setreq = load('multi_UE.mat').num_setreq;
-B = double(load('multi_UE.mat').B);
-P = load('multi_UE.mat').P;
-sigmsqr = load('multi_UE.mat').sigmsqr;
-eta = double(load('multi_UE.mat').eta);
-predicted_len = load('multi_UE.mat').predicted_len;
-rayleigh_gain = load('multi_UE.mat').rayleigh_gain;
+T = load('multi_distance.mat').T;
+num_RU = load('multi_distance.mat').num_RU;
+multi_num_UE = load('multi_distance.mat').multi_num_UE;
+num_RB = double(load('multi_distance.mat').num_RB);
+num_ref = load('multi_distance.mat').num_ref;
+UERU = load('multi_distance.mat').UERU;
+total_UE = load('multi_distance.mat').total_UE;
+gamma = load('multi_distance.mat').gamma;
+num_setreq = load('multi_distance.mat').num_setreq;
+B = double(load('multi_distance.mat').B);
+P = load('multi_distance.mat').P;
+sigmsqr = load('multi_distance.mat').sigmsqr;
+eta = double(load('multi_distance.mat').eta);
+predicted_len = load('multi_distance.mat').predicted_len;
+rayleigh_gain = load('multi_distance.mat').rayleigh_gain;
 
-multi_distance = load('multi_UE.mat').multi_distance_true;
-multi_prediction = load('multi_UE.mat').multi_prediction;
+multi_distance = load('multi_distance.mat').multi_distance_true; %(6, 55, 15, 3)
+multi_prediction = load('multi_distance.mat').multi_prediction; %(6, 50, 3, 15, 3)
 
 multi_rec_dr_random = [];
 multi_rec_dr_avg = [];
 multi_rec_dr_op = []; 
-multi_rec_e_random = zeros(length(multi_num_UE), T, multi_num_UE(end)*num_RU, num_RB);
-multi_rec_e_op = zeros(length(multi_num_UE), T, multi_num_UE(end)*num_RU, num_RB);
-multi_rec_e_avg = zeros(length(multi_num_UE), T, multi_num_UE(end)*num_RU, num_RB);
+multi_rec_e_random = zeros(6, T, total_UE, num_RB);
+multi_rec_e_op = zeros(6, T, total_UE, num_RB);
+multi_rec_e_avg = zeros(6, T, total_UE, num_RB);
 
 for a = 1:length(multi_num_UE)
-    UERU = multi_num_UE(a);
-    total_UE = UERU * num_RU;
-
     user_RU_norm = zeros(1, total_UE); % RU index for every user
     user_RU_op = zeros(1, total_UE);
     distance = squeeze(multi_distance(a,:,:,:));

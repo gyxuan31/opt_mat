@@ -64,6 +64,30 @@ for t = num_ref+1:T
     end
 
     % ----- RANDOM -----
+    % check RB cannot allocated to 2 UEs under one RU
+    for i = 1:num_RU % set the repeat UE = 0
+        for k = 1:num_RB
+            ue_list = RU_UE_norm{i}; % UE under RU(i)
+            allocated_UE_random = ue_list(e_random(ue_list, k) > 0);
+            if numel(allocated_UE_random) > 1
+                dist_list = zeros(1, numel(allocated_UE_random));
+                for idx = 1:numel(allocated_UE_random)
+                    u = allocated_UE_random(idx);
+                    dist_list(idx) = distance(t, u, i);
+                end
+                [~, min_idx] = min(dist_list);
+                keep_ue = allocated_UE_random(min_idx); % keep the shortest UE
+                for idx = 1:numel(allocated_UE_random) % set others = 0
+                    u = allocated_UE_random(idx);
+                    if u ~= keep_ue
+                        e_random(u, k) = 0;
+                    else
+                        e_random(u, k) = 1;
+                    end
+                end
+            end
+        end
+    end
     data_rate_random = zeros(1, total_UE);
     for n = 1:total_UE
         for k = 1:num_RB
