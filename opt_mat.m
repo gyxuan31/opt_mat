@@ -25,16 +25,6 @@ load_pred = load('parameter.mat');
 prediction = load_pred.prediction;
 prediction = reshape(prediction, T-num_ref, predicted_len, total_UE, num_RU);
 
-% calculate every UE connect which RU
-for t = 1:T
-    for i = 1:total_UE
-        temp = zeros(1, num_RU);
-        for j = 1:num_RU
-            temp(j) = distance(t,i,j);
-        end
-        [~, user_RU_norm(i)] = min(temp);
-    end
-end
 
 % init
 rb_counts = randi([0, num_RB/num_RU], 1, total_UE); % initial allocation
@@ -56,6 +46,13 @@ end
 
 % ---------- NORMAL BASELINE ----------
 for t = num_ref+1:T
+    for i = 1:total_UE % calculate every UE connect which RU
+        temp = zeros(1, num_RU);
+        for j = 1:num_RU
+            temp(j) = distance(t,i,j);
+        end
+        [~, user_RU_norm(i)] = min(temp);
+    end
     e_avg = zeros(total_UE, num_RB);
     RU_UE_norm = cell(1, num_RU); % save the index of UE under every RU
     for r = 1:num_RU

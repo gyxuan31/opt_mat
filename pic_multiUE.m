@@ -1,32 +1,34 @@
-rng(1);
+rng(3);
 
-T = load('multi_UE.mat').T;
-num_RU = load('multi_UE.mat').num_RU;
-% UERU = load('multi_UE.mat').UERU; % UE under every RU
-% total_UE = load('multi_UE.mat').total_UE;
-multi_num_UE = load('multi_UE.mat').multi_num_UE;
-num_RB = double(load('multi_UE.mat').num_RB);
-num_ref = load('multi_UE.mat').num_ref;
-gamma = load('multi_UE.mat').gamma;
-num_setreq = load('multi_UE.mat').num_setreq;
-B = double(load('multi_UE.mat').B);
-P = load('multi_UE.mat').P;
-sigmsqr = load('multi_UE.mat').sigmsqr;
-eta = double(load('multi_UE.mat').eta);
-predicted_len = load('multi_UE.mat').predicted_len;
-rayleigh_gain = load('multi_UE.mat').rayleigh_gain;
+file = 'multi_UE_sup.mat';
+% T = load(file).T;
+T = 25;
+num_RU = load(file).num_RU;
+% UERU = load(file).UERU; % UE under every RU
+% total_UE = load(file).total_UE;
+multi_num_UE = load(file).multi_num_UE;
+num_RB = double(load(file).num_RB);
+num_ref = load(file).num_ref;
+gamma = load(file).gamma;
+num_setreq = load(file).num_setreq;
+B = double(load(file).B);
+P = load(file).P;
+sigmsqr = load(file).sigmsqr;
+eta = double(load(file).eta);
+predicted_len = load(file).predicted_len;
+rayleigh_gain = load(file).rayleigh_gain;
 
-multi_distance = load('multi_UE.mat').multi_distance_true;
-multi_prediction = load('multi_UE.mat').multi_prediction;
+multi_distance = load(file).multi_distance_true;
+multi_prediction = load(file).multi_prediction;
 
 multi_rec_dr_random = [];
 multi_rec_dr_avg = [];
-multi_rec_dr_op = []; 
+multi_rec_dr_op = [0]; 
 multi_rec_e_random = zeros(length(multi_num_UE), T, multi_num_UE(end)*num_RU, num_RB);
 multi_rec_e_op = zeros(length(multi_num_UE), T, multi_num_UE(end)*num_RU, num_RB);
 multi_rec_e_avg = zeros(length(multi_num_UE), T, multi_num_UE(end)*num_RU, num_RB);
 
-for a = 1:length(multi_num_UE)
+for a = 1:length(multi_num_UE) 
     UERU = multi_num_UE(a);
     total_UE = UERU * num_RU;
 
@@ -34,21 +36,10 @@ for a = 1:length(multi_num_UE)
     user_RU_op = zeros(1, total_UE);
     distance = squeeze(multi_distance(a,:,:,:));
     prediction = squeeze(multi_prediction(a,:,:,:,:));
-    % calculate every UE connect which RU
-    for t = num_ref+1
-        for i = 1:total_UE
-            temp = zeros(1, num_RU);
-            for j = 1:num_RU
-                temp(j) = distance(t,i,j);
-            end
-            [~, user_RU_norm(i)] = min(temp);
-        end
-    end
     
     % init
     rb_counts = randi([0, num_RB/num_RU], 1, total_UE); % initial allocation
-    e_random = zeros(total_UE, num_RB);
-    e_avg = zeros(total_UE, num_RB);
+    e_random_ori = zeros(total_UE, num_RB);
     rec_dr_random = []; % record data rate
     rec_dr_avg = [];
     rec_dr_op = [];
@@ -61,12 +52,19 @@ for a = 1:length(multi_num_UE)
         count = rb_counts(i);
         if count > 0
             selected_rbs = randperm(num_RB, count); 
-            e_random(i, selected_rbs) = 1;
+            e_random_ori(i, selected_rbs) = 1;
         end
     end
     
     % ---------- NORMAL BASELINE ----------
     for t = num_ref+1:T
+        for i = 1:total_UE % calculate every UE connect which RU
+            temp = zeros(1, num_RU);
+            for j = 1:num_RU
+                temp(j) = distance(t,i,j);
+            end
+            [~, user_RU_norm(i)] = min(temp);
+        end
         RU_UE_norm = cell(1, num_RU); % save the index of UE under every RU
         for r = 1:num_RU
             idx = find(user_RU_norm == r);
@@ -74,6 +72,7 @@ for a = 1:length(multi_num_UE)
         end
     
         % ----- RANDOM -----
+        e_random = e_random_ori;
         % check RB cannot allocated to 2 UEs under one RU
         for i = 1:num_RU % set the repeat UE = 0
             for k = 1:num_RB
@@ -121,6 +120,7 @@ for a = 1:length(multi_num_UE)
         rec_dr_random = [rec_dr_random, sum(log(1+data_rate_random))];
     
         % ----- AVERAGE -----
+        e_avg = zeros(total_UE, num_RB);
         for r = 1:num_RU
             ue_list = RU_UE_norm{r};
             num_ue = numel(ue_list);
@@ -174,8 +174,8 @@ for a = 1:length(multi_num_UE)
     %  ---------- OP ----------
     nvars = double(predicted_len * total_UE * num_RB);
 
-    lb = zeros(1, nvars);
-    ub = ones(1, nvars);
+    lb = zeros(nvars, 1);
+    ub = ones(nvars, 1);
 
     for t = 1:T-num_ref
         disp(a); disp(t);
@@ -200,23 +200,33 @@ for a = 1:length(multi_num_UE)
         end
 
         popSize = 80;
-        initPop = zeros(popSize, nvars);
+        initPop =zeros(popSize, nvars);
         initPop(popSize/2+1:end, :) = 1;
 
         objfun = @(e) compute_total_rate(round(e), predicted_len, total_UE, num_RB, pre_distance, rayleigh_gain, P, sigmsqr, eta, B, user_RU_op);
         confun = @(e) constraint(e, predicted_len, total_UE, num_RB, gamma, num_setreq, rb_counts, num_RU, RU_UE_op);
         options = optimoptions('ga', 'PopulationSize', popSize, 'MaxGenerations', 50, 'Display', 'iter',  'ConstraintTolerance', 1e-6,...
             'InitialPopulationMatrix', initPop);
-        [e_opt, fval] = ga(objfun, nvars, [], [], [], [], lb, ub, confun, options);
-        % e_opt = zeros(1,nvars);
-        % fval = 0;
 
+        % [e_opt, fval] = ga(objfun, nvars, [], [], [], [], lb, ub, confun, options);
 
-        % fmin = @(e) compute_total_rate(e, predicted_len, total_UE, num_RB, pre_distance, rayleigh_gain, P, sigmsqr, eta, B, T, user_RU, num_RU);
+        e_opt = zeros(1,nvars);
+        fval = 0;
+
+        % e_opt = particleswarm(objfun, nvars, lb, ub);
+
+        % disp(repmat(e_random, predicted_len, 1, 1))
+        % x0 = reshape(repmat(e_random, predicted_len, 1, 1), nvars, 1);
+        % disp(class(reshape(repmat(e_random, predicted_len, 1, 1), nvars, 1)));
+        % disp(class(lb));
+        % disp(class(ub));
+        % format long
+        % disp(min(x0 - lb));
+        % disp(min(ub - x0));
         % options = optimoptions('fmincon', 'MaxIterations', 100, 'Display', 'iter-detailed', ...
-        %     'MaxFunctionEvaluations', 1e5,'Algorithm','interior-point'); % , 'SpecifyObjectiveGradient',true
-        % [e_opt, fval] = fmincon(fmin, repmat(e_norm, predicted_len, 1, 1), [], [], [], [], lb, ub, @constraints, options); % repmat(e_norm, predicted_len, 1, 1)
-        e_opt;
+        %     'MaxFunctionEvaluations', 1e5,'Algorithm','interior-point','StepTolerance', 1e-8); % , 'SpecifyObjectiveGradient',true
+        % [e_opt, fval] = fmincon(objfun, reshape(repmat(e_random, predicted_len, 1, 1), 1,nvars), [], [], [], [], lb, ub, confun, options); % repmat(e_norm, predicted_len, 1, 1) randi([0,1],1,nvars)
+        % e_opt;
         for i = 1: nvars
             if e_opt(i) >= 0.5
                 e_opt(i) = 1;
@@ -277,7 +287,7 @@ for a = 1:length(multi_num_UE)
 
         fprintf('Random data rate: %.2f\n', rec_dr_random(t));
         fprintf('Average data rate: %.2f\n', rec_dr_avg(t));
-        fprintf('Optmed data rate: %.2f\n', rec_dr_op(t));
+        fprintf('Optmed data rate: %.2f\n', rec_dr_op);
 
         % subplot(1,2,1);
         % hold on;
@@ -312,5 +322,5 @@ for a = 1:length(multi_num_UE)
     multi_rec_e_avg(a, :, 1:total_UE, :) = rec_e_avg;
     multi_rec_e_random(a, :, 1:total_UE, :) = rec_e_random;
 end
-fprintf('Normal data rate: %.2f\n', multi_rec_dr_random);
+fprintf('Normal data rate: %.2f\n', multi_rec_dr_avg);
 fprintf('Optmed data rate: %.2f\n', multi_rec_dr_op);
